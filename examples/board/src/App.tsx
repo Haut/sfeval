@@ -44,7 +44,7 @@ function App() {
     fen,
     workerPath: '/engine/stockfish.js',
     multiPV: 3,
-    stableDepthThreshold: 8,
+    stableDepthThreshold: 20,
     debug: true,
     onError: (err) => console.error('[SfEval error]', err),
   });
