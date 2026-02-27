@@ -13,7 +13,28 @@ Lightweight browser wrapper for [Stockfish](https://stockfishchess.org/) WASM wi
 npm install stockfish-kit
 ```
 
-You also need a Stockfish WASM build served as a web worker. The [`stockfish`](https://www.npmjs.com/package/stockfish) npm package works well — copy its JS file to your public directory (e.g. `public/engine/stockfish.js`).
+You also need a Stockfish WASM build served as a web worker. The [`stockfish`](https://www.npmjs.com/package/stockfish) npm package works well:
+
+```bash
+npm install stockfish
+```
+
+Then copy the engine files into your public directory so the browser can load them:
+
+```bash
+mkdir -p public/engine
+cp node_modules/stockfish/bin/stockfish-18-lite-single.js public/engine/stockfish.js
+cp node_modules/stockfish/bin/stockfish-18-lite-single.wasm public/engine/stockfish.wasm
+```
+
+Available builds (in `node_modules/stockfish/bin/`):
+
+| Build | NNUE | Threads | Notes |
+|---|---|---|---|
+| `stockfish-18-lite-single` | lite | single | Smallest, works everywhere |
+| `stockfish-18-single` | full | single | Stronger, no COOP/COEP needed |
+| `stockfish-18-lite` | lite | multi | Requires [cross-origin isolation](#cross-origin-isolation) |
+| `stockfish-18` | full | multi | Strongest, requires cross-origin isolation |
 
 ## React Quickstart
 
