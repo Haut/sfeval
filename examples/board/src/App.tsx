@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
-import { useSfEval } from '@haut/sfeval/react';
-import type { AnalysisLine } from '@haut/sfeval';
+import { useSfEval } from 'stockfish-kit/react';
+import type { AnalysisLine } from 'stockfish-kit';
 import { EvalBar } from './EvalBar';
 import './App.css';
 

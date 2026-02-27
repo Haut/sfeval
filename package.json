@@ -1,5 +1,5 @@
 {
-  "name": "@haut/sfeval",
+  "name": "stockfish-kit",
   "version": "0.0.1",
   "description": "Lightweight browser wrapper for Stockfish WASM with UCI state management",
   "type": "module",
