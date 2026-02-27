@@ -16,6 +16,16 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
+    },
+    "./react": {
+      "import": {
+        "types": "./dist/react.d.ts",
+        "default": "./dist/react.js"
+      },
+      "require": {
+        "types": "./dist/react.d.cts",
+        "default": "./dist/react.cjs"
+      }
     }
   },
   "files": [
@@ -28,9 +38,25 @@
     "prepublishOnly": "npm run build"
   },
   "sideEffects": false,
-  "keywords": ["stockfish", "chess", "wasm", "web-worker", "uci", "engine"],
+  "keywords": [
+    "stockfish",
+    "chess",
+    "wasm",
+    "web-worker",
+    "uci",
+    "engine"
+  ],
   "license": "MIT",
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@types/react": "^19.2.14",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
