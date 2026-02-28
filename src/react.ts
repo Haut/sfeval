@@ -1,23 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { SfEval } from './sfeval';
 import { INITIAL_ANALYSIS } from './types';
-import type { AnalysisInfo } from './types';
+import type { AnalysisInfo, SfEvalOptions } from './types';
 
-export interface UseSfEvalOptions {
+export interface UseSfEvalOptions extends Omit<SfEvalOptions, 'onAnalysisUpdate'> {
   /** FEN of the position to analyze. Pass null/undefined to pause analysis. */
   fen: string | null | undefined;
   /** Maximum search depth. @default 25 */
   maxDepth?: number;
-  /** URL or path to the Stockfish WASM/JS worker script. @default '/engine/stockfish.js' */
-  workerPath?: string;
-  /** Number of principal variations. @default 3 */
-  multiPV?: number;
-  /** Minimum depth before results are emitted. @default 12 */
-  stableDepthThreshold?: number;
-  /** Enable debug logging. @default false */
-  debug?: boolean;
-  /** Called when the engine encounters an error. */
-  onError?: (error: string) => void;
 }
 
 export interface UseSfEvalReturn {

@@ -20,8 +20,6 @@ export interface AnalysisInfo {
   lines?: AnalysisLine[]; // MultiPV lines (when enabled)
 }
 
-export type EngineState = 'idle' | 'initializing' | 'ready' | 'analyzing' | 'error';
-
 export const INITIAL_ANALYSIS: AnalysisInfo = {
   depth: 0,
   score: null,

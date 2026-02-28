@@ -24,7 +24,6 @@ export class SfEval {
   private isAnalyzing = false;
   private isWaitingForBestmove = false; // Waiting for bestmove before we can send isready
   private isWaitingForReady = false;
-  private currentAnalysis: AnalysisInfo = { ...INITIAL_ANALYSIS };
   private pendingAnalysisData: AnalysisInfo = { ...INITIAL_ANALYSIS }; // Accumulates until stable
   private hasReachedStableDepth = false;
   private multiPvLines: Map<number, AnalysisLine> = new Map(); // Track MultiPV lines
@@ -241,7 +240,7 @@ export class SfEval {
    */
   private parseInfoLine(line: string): void {
     // Skip free-form diagnostic strings (e.g. "info string NNUE evaluation using ...")
-    if (/^info\s+string\b/.test(line)) return;
+    if (line.startsWith('info string')) return;
 
     // Ignore info lines if we're transitioning between searches
     // These would be stale data from the search we just stopped
@@ -255,12 +254,13 @@ export class SfEval {
     const depthMatch = line.match(/\bdepth\s+(\d+)/);
     if (!depthMatch) return;
 
-    const scoreMatch = line.match(/\bscore\s+(cp|mate)\s+(-?\d+)/);
+    // Capture score and optionally detect aspiration window bounds in one pass
+    const scoreMatch = line.match(/\bscore\s+(cp|mate)\s+(-?\d+)(?:\s+(lowerbound|upperbound))?/);
     if (!scoreMatch) return;
 
     // Skip aspiration window bound scores — these are intermediate, unreliable
     // evaluations that would cause eval flickering if treated as exact.
-    if (/\bscore\s+(?:cp|mate)\s+-?\d+\s+(?:lowerbound|upperbound)/.test(line)) return;
+    if (scoreMatch[3]) return;
 
     const depth = parseInt(depthMatch[1], 10);
 
@@ -288,13 +288,10 @@ export class SfEval {
     // Update main analysis from line 1 (best line)
     const mainLine = this.multiPvLines.get(1);
     if (mainLine) {
-      this.pendingAnalysisData = {
-        ...this.pendingAnalysisData,
-        depth: mainLine.depth,
-        score: mainLine.score,
-        mate: mainLine.mate,
-        pv: mainLine.pv,
-      };
+      this.pendingAnalysisData.depth = mainLine.depth;
+      this.pendingAnalysisData.score = mainLine.score;
+      this.pendingAnalysisData.mate = mainLine.mate;
+      this.pendingAnalysisData.pv = mainLine.pv;
 
       // Check if we've reached stable depth
       if (!this.hasReachedStableDepth && mainLine.depth >= this.stableDepthThreshold) {
@@ -304,12 +301,13 @@ export class SfEval {
 
       // Only emit once all MultiPV lines are at the same depth to avoid
       // a mixed-depth lines array (e.g. line 1 at depth N, line 3 still at N-1)
-      const allSameDepth = Array.from(this.multiPvLines.values()).every(l => l.depth === mainLine.depth);
+      let allSameDepth = true;
+      for (const l of this.multiPvLines.values()) {
+        if (l.depth !== mainLine.depth) { allSameDepth = false; break; }
+      }
       if (this.hasReachedStableDepth && this.multiPvLines.size >= this.multiPV && allSameDepth) {
-        const lines = Array.from(this.multiPvLines.values()).sort((a, b) => a.multipv - b.multipv);
-        this.pendingAnalysisData = { ...this.pendingAnalysisData, lines };
-        this.currentAnalysis = { ...this.pendingAnalysisData };
-        this.onAnalysisUpdate?.(this.currentAnalysis);
+        this.pendingAnalysisData.lines = Array.from(this.multiPvLines.values()).sort((a, b) => a.multipv - b.multipv);
+        this.onAnalysisUpdate?.({ ...this.pendingAnalysisData });
       }
     }
   }
@@ -326,14 +324,10 @@ export class SfEval {
         this.isAnalyzing = false;
         return;
       }
-      this.pendingAnalysisData = {
-        ...this.pendingAnalysisData,
-        bestMove: move,
-      };
+      this.pendingAnalysisData.bestMove = move;
       // Only emit if stable depth was reached (honor stableDepthThreshold)
       if (this.hasReachedStableDepth) {
-        this.currentAnalysis = { ...this.pendingAnalysisData };
-        this.onAnalysisUpdate?.(this.currentAnalysis);
+        this.onAnalysisUpdate?.({ ...this.pendingAnalysisData });
       }
     }
     this.isAnalyzing = false;
@@ -398,6 +392,18 @@ export class SfEval {
   }
 
   /**
+   * Null out worker event handlers, terminate, and release the reference.
+   */
+  private terminateWorker(): void {
+    if (!this.worker) return;
+    this.worker.onmessage = null;
+    this.worker.onerror = null;
+    this.worker.onmessageerror = null;
+    try { this.worker.terminate(); } catch { /* already terminated */ }
+    this.worker = null;
+  }
+
+  /**
    * Mark the worker as destroyed and notify error handlers.
    * Called when the worker crashes or enters an invalid state.
    */
@@ -408,17 +414,7 @@ export class SfEval {
     this.isReady = false;
     this.initPromise = null;
     this.onError?.(reason);
-    try {
-      if (this.worker) {
-        this.worker.onmessage = null;
-        this.worker.onerror = null;
-        this.worker.onmessageerror = null;
-        this.worker.terminate();
-      }
-    } catch {
-      // Ignore termination errors
-    }
-    this.worker = null;
+    this.terminateWorker();
   }
 
   /**
@@ -502,22 +498,7 @@ export class SfEval {
   destroy(): void {
     // Mark as destroyed first to prevent any further sends
     this.isDestroyed = true;
-
-    // Null out event handlers BEFORE termination to prevent
-    // any final events from firing into stale callbacks
-    if (this.worker) {
-      this.worker.onmessage = null;
-      this.worker.onerror = null;
-      this.worker.onmessageerror = null;
-    }
-
-    try {
-      this.worker?.terminate();
-    } catch {
-      // Worker already terminated, ignore
-    }
-
-    this.worker = null;
+    this.terminateWorker();
     this.isReady = false;
     this.isAnalyzing = false;
     this.isWaitingForBestmove = false;
@@ -527,7 +508,6 @@ export class SfEval {
     this.pendingSetOption = null;
     this.restoreAnalysisAfterOption = null;
     this.pendingAnalysisData = { ...INITIAL_ANALYSIS };
-    this.currentAnalysis = { ...INITIAL_ANALYSIS };
     this.multiPvLines.clear();
     this.onAnalysisUpdate = null;
     this.onReady = null;
